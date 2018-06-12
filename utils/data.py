@@ -487,6 +487,12 @@ class Data:
         if the_item in config:
             self.HP_l2 = float(config[the_item])
 
+        the_item = 'train_acc_file'
+        if the_item in config:
+            self.train_acc_file = config[the_item]
+        the_item = 'dev_acc_file'
+        if the_item in config:
+            self.dev_acc_file = config[the_item]
 
 
 def config_file_to_dict(input_file):

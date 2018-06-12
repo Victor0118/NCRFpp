@@ -69,8 +69,11 @@ def read_instance(input_file, word_alphabet, char_alphabet, feature_alphabets, l
             char_Ids.append(char_Id)
         else:
             if (max_sent_length < 0) or (len(words) < max_sent_length):
+                if len(words) == 0:
+                    continue
                 instence_texts.append([words, features, chars, labels])
                 instence_Ids.append([word_Ids, feature_Ids, char_Ids,label_Ids])
+
             words = []
             features = []
             chars = []

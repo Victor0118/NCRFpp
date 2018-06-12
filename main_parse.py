@@ -281,7 +281,7 @@ def train(data):
     model = SeqModel(data)
     loss_function = nn.NLLLoss()
     if data.optimizer.lower() == "sgd":
-        optimizer = optim.SGD(model.parameters(), lr=data.HP_lr, momentum=data.HP_momentum,weight_decay=data.HP_l2)
+        optimizer = optim.SGD(model.parameters(), lr=data.HP_lr, mom    entum=data.HP_momentum,weight_decay=data.HP_l2)
     elif data.optimizer.lower() == "adagrad":
         optimizer = optim.Adagrad(model.parameters(), lr=data.HP_lr, weight_decay=data.HP_l2)
     elif data.optimizer.lower() == "adadelta":

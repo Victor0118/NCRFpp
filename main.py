@@ -11,7 +11,6 @@ import random
 import copy
 import torch
 import gc
-import cPickle as pickle
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,6 +19,7 @@ import numpy as np
 from utils.metric import get_ner_fmeasure
 from model.seqmodel import SeqModel
 from utils.data import Data
+import pickle
 
 seed_num = 42
 random.seed(seed_num)
@@ -193,6 +193,8 @@ def evaluate(data, model, name, nbest=None):
         gold_results += gold_label
     decode_time = time.time() - start_time
     speed = len(instances)/decode_time
+    # print("gold_results: {}".format(gold_results))
+    # print("pred_results: {}".format(pred_results))
     acc, p, r, f = get_ner_fmeasure(gold_results, pred_results, data.tagScheme)
     if nbest:
         return speed, acc, p, r, f, nbest_pred_results, pred_scores
@@ -222,14 +224,30 @@ def batchify_with_label(input_batch_list, gpu, volatile_flag=False):
     labels = [sent[3] for sent in input_batch_list]
     word_seq_lengths = torch.LongTensor(map(len, words))
     max_seq_len = word_seq_lengths.max()
-    word_seq_tensor = autograd.Variable(torch.zeros((batch_size, max_seq_len)), volatile =  volatile_flag).long()
-    label_seq_tensor = autograd.Variable(torch.zeros((batch_size, max_seq_len)),volatile =  volatile_flag).long()
+    for i, wl in enumerate(word_seq_lengths):
+        if wl == 0:
+            print(input_batch_list[i])
+            batch_size -= 1
+    # if batch_size == 0:
+    #     print(max_seq_len)
+    #     print(words)
+    #     print(input_batch_list)
+    word_seq_tensor = autograd.Variable(torch.zeros((batch_size, max_seq_len)), volatile=volatile_flag).long()
+    label_seq_tensor = autograd.Variable(torch.zeros((batch_size, max_seq_len)), volatile=volatile_flag).long()
     feature_seq_tensors = []
     for idx in range(feature_num):
         feature_seq_tensors.append(autograd.Variable(torch.zeros((batch_size, max_seq_len)),volatile =  volatile_flag).long())
     mask = autograd.Variable(torch.zeros((batch_size, max_seq_len)),volatile =  volatile_flag).byte()
     for idx, (seq, label, seqlen) in enumerate(zip(words, labels, word_seq_lengths)):
-        word_seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
+        if seqlen == 0:
+            continue
+        try:
+            word_seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
+        except Exception as e:
+            # print(max_seq_len, seqlen, seq, input_batch_list)
+            # print(words)
+            raise e
+        
         label_seq_tensor[idx, :seqlen] = torch.LongTensor(label)
         mask[idx, :seqlen] = torch.Tensor([1]*seqlen)
         for idy in range(feature_num):
@@ -293,6 +311,8 @@ def train(data):
         print("Optimizer illegal: %s"%(data.optimizer))
         exit(0)
     best_dev = -10
+    train_acc_list = []
+    dev_acc_list = []
     # data.HP_iteration = 1
     ## start training
     for idx in range(data.HP_iteration):
@@ -318,7 +338,7 @@ def train(data):
         for batch_id in range(total_batch):
             start = batch_id*batch_size
             end = (batch_id+1)*batch_size 
-            if end >train_num:
+            if end > train_num:
                 end = train_num
             instance = data.train_Ids[start:end]
             if not instance:
@@ -346,6 +366,7 @@ def train(data):
             model.zero_grad()
         temp_time = time.time()
         temp_cost = temp_time - temp_start
+        train_acc_list.append((right_token+0.)/whole_token)
         print("     Instance: %s; Time: %.2fs; loss: %.4f; acc: %s/%s=%.4f"%(end, temp_cost, sample_loss, right_token, whole_token,(right_token+0.)/whole_token))       
         
         epoch_finish = time.time()
@@ -359,6 +380,16 @@ def train(data):
         speed, acc, p, r, f, _,_ = evaluate(data, model, "dev")
         dev_finish = time.time()
         dev_cost = dev_finish - epoch_finish
+        dev_acc_list.append(acc)
+
+        train_file = data.train_acc_file
+        print("save Accs to pickle file: {}".format(train_file))
+        with open(train_file, "wb") as tl:
+            pickle.dump(train_acc_list, tl)
+
+        with open(data.dev_acc_file, "wb") as tl:
+            pickle.dump(dev_acc_list, tl)
+
 
         if data.seg:
             current_score = f
@@ -373,7 +404,7 @@ def train(data):
             else:
                 print "Exceed previous best acc score:", best_dev
             model_name = data.model_dir +'.'+ str(idx) + ".model"
-            print "Save current best model in file:", model_name
+            p   rint "Save current best model in file:", model_name
             torch.save(model.state_dict(), model_name)
             best_dev = current_score 
         # ## decode test
