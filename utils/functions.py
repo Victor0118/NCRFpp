@@ -2,10 +2,11 @@
 # @Author: Jie
 # @Date:   2017-06-15 14:23:06
 # @Last Modified by:   Jie Yang,     Contact: jieynlp@gmail.com
-# @Last Modified time: 2018-03-29 14:48:04
+# @Last Modified time: 2018-06-10 17:49:50
+from __future__ import print_function
+from __future__ import absolute_import
 import sys
 import numpy as np
-from alphabet import Alphabet
 
 def normalize_word(word):
     new_word = ""
@@ -33,7 +34,12 @@ def read_instance(input_file, word_alphabet, char_alphabet, feature_alphabets, l
     for line in in_lines:
         if len(line) > 2:
             pairs = line.strip().split()
-            word = pairs[0].decode('utf-8')
+
+            if sys.version_info[0] < 3:
+                word = pairs[0].decode('utf-8')
+            else:
+                word = pairs[0]
+
             if number_normalized:
                 word = normalize_word(word)
             label = pairs[-1]
@@ -68,9 +74,7 @@ def read_instance(input_file, word_alphabet, char_alphabet, feature_alphabets, l
             chars.append(char_list)
             char_Ids.append(char_Id)
         else:
-            if (max_sent_length < 0) or (len(words) < max_sent_length):
-                if len(words) == 0:
-                    continue
+            if (len(words) > 0) and ((max_sent_length < 0) or (len(words) < max_sent_length)) :
                 instence_texts.append([words, features, chars, labels])
                 instence_Ids.append([word_Ids, feature_Ids, char_Ids,label_Ids])
 
@@ -85,7 +89,7 @@ def read_instance(input_file, word_alphabet, char_alphabet, feature_alphabets, l
     return instence_texts, instence_Ids
 
 
-def build_pretrain_embedding(embedding_path, word_alphabet, embedd_dim=100, norm=True):    
+def build_pretrain_embedding(embedding_path, word_alphabet, embedd_dim=100, norm=True):
     embedd_dict = dict()
     if embedding_path != None:
         embedd_dict, embedd_dim = load_pretrain_emb(embedding_path)
@@ -114,7 +118,7 @@ def build_pretrain_embedding(embedding_path, word_alphabet, embedd_dim=100, norm
     pretrained_size = len(embedd_dict)
     print("Embedding:\n     pretrain word:%s, prefect match:%s, case_match:%s, oov:%s, oov%%:%s"%(pretrained_size, perfect_match, case_match, not_match, (not_match+0.)/alphabet_size))
     return pretrain_emb, embedd_dim
-       
+
 def norm2one(vec):
     root_sum_square = np.sqrt(np.sum(np.square(vec)))
     return vec/root_sum_square
@@ -134,10 +138,14 @@ def load_pretrain_emb(embedding_path):
                 assert (embedd_dim + 1 == len(tokens))
             embedd = np.empty([1, embedd_dim])
             embedd[:] = tokens[1:]
-            embedd_dict[tokens[0].decode('utf-8')] = embedd
+            if sys.version_info[0] < 3:
+                first_col = tokens[0].decode('utf-8')
+            else:
+                first_col = tokens[0]
+            embedd_dict[first_col] = embedd
     return embedd_dict, embedd_dim
 
 if __name__ == '__main__':
     a = np.arange(9.0)
-    print a
-    print norm2one(a)
+    print(a)
+    print(norm2one(a))
